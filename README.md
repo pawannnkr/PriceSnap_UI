@@ -1,4 +1,4 @@
-# Amazon Price Tracker - Chrome Extension
+# PriceSnap - Chrome Extension
 
 A Chrome extension built with React for tracking Amazon product prices. Integrates with a backend API to store price history, track price changes, and send notifications.
 
@@ -14,7 +14,7 @@ A Chrome extension built with React for tracking Amazon product prices. Integrat
 ## Project Structure
 
 ```
-Price_tracker_UI/
+PriceSnap_UI/
 ├── manifest.json                # Chrome Extension Manifest v3
 ├── index.html                   # Popup entry HTML
 ├── package.json                 # Dependencies & scripts
@@ -50,17 +50,19 @@ Price_tracker_UI/
 
 ### 1. Install Dependencies
 ```bash
-cd Price_tracker_UI
+cd PriceSnap_UI
 npm install
 ```
 
 ### 2. Configure Backend API
 
-Edit [src/config.js](src/config.js) and set your backend API URL:
+The project reads the backend base URL from a Vite environment variable. Create a local `.env` file with the variable below (do not commit your `.env`):
 
-```javascript
-export const API_BASE_URL = 'https://your-backend.com/api';
 ```
+VITE_API_BASE_URL=https://your-backend.com/api
+```
+
+An example is provided in `.env.example`. The app will fall back to the embedded default URL if the env var is not set.
 
 ### 3. Build the Extension
 ```bash
@@ -311,7 +313,7 @@ The `.gitignore` file excludes the following from version control:
 ```
 node_modules/          # npm dependencies
 dist/                  # Built extension output
-.env.example           # Environment variable example
+.env                   # Local environment (do NOT commit)
 .DS_Store              # macOS system files
 .vscode/               # VS Code settings
 *.log                  # Log files
