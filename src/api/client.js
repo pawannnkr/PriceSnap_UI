@@ -1,195 +1,283 @@
-import axios from 'axios';
-import { ENDPOINTS } from '../config';
+import { API_BASE_URL } from '../config';
 
 class APIClient {
   constructor() {
-    this.client = axios.create({
-      timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    this.baseURL = API_BASE_URL;
+    this.timeout = 10000;
+    this.headers = {
+      'Content-Type': 'application/json',
+    };
   }
 
-  // Add a product (expects { url, threshold })
+  /**
+   * Make HTTP requests using native Fetch API
+   */
+  async request(method, endpoint, data = null, params = null) {
+    let url = `${this.baseURL}${endpoint}`;
+
+    // Add query parameters
+    if (params && Object.keys(params).length > 0) {
+      const queryString = new URLSearchParams(
+        Object.entries(params).reduce((acc, [key, value]) => {
+          if (value !== null && value !== undefined) {
+            acc[key] = value;
+          }
+          return acc;
+        }, {})
+      ).toString();
+      url += `?${queryString}`;
+    }
+
+    const options = {
+      method,
+      headers: this.headers,
+      timeout: this.timeout,
+    };
+
+    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+      options.body = JSON.stringify(data);
+    }
+
+    try {
+      const response = await fetch(url, options);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        throw new Error(errorData.message || errorData.error || response.statusText);
+      }
+
+      const responseData = await response.json().catch(() => null);
+      return responseData;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // ==================== USER APIs ====================
+
+  /**
+   * 1. Create a new user
+   * @param {Object} userData - { email, name }
+   */
+  async createUser(userData) {
+    try {
+      return await this.request('POST', '/users', userData);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 2. Get all users
+   */
+  async getAllUsers() {
+    try {
+      return await this.request('GET', '/users');
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 3. Get user by ID
+   * @param {number} userId
+   */
+  async getUserById(userId) {
+    try {
+      return await this.request('GET', `/users/${userId}`);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 4. Remove/Delete user
+   * @param {number} userId
+   */
+  async deleteUser(userId) {
+    try {
+      return await this.request('DELETE', `/users/${userId}`);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ==================== PRODUCT APIs ====================
+
+  /**
+   * 5. Add a new product
+   * @param {Object} productData - { user_id, url, threshold }
+   */
   async addProduct(productData) {
     try {
-      const payload = {
-        url: productData.url,
-        threshold: productData.alertPrice || productData.currentPrice || productData.threshold,
-      };
-      const response = await this.client.post(ENDPOINTS.ADD_PRODUCT, payload);
-      return response.data;
+      return await this.request('POST', '/products', productData);
     } catch (error) {
-      throw this.handleError(error);
+      throw error;
     }
   }
 
-  // Get all tracked products
-  async getProducts() {
+  /**
+   * 6. Check price for a specific product
+   * @param {Object} checkData - { user_id, url }
+   */
+  async checkProductPrice(checkData) {
     try {
-      const response = await this.client.get(ENDPOINTS.GET_ALL_TRACKED_PRODUCTS);
-      return response.data;
+      return await this.request('POST', '/products/check', checkData);
     } catch (error) {
-      throw this.handleError(error);
+      throw error;
     }
   }
 
-  // Remove a product by id
-  async removeProduct(productId) {
+  /**
+   * 7. Remove/Delete product by ID
+   * @param {number} productId
+   * @param {number} userId
+   */
+  async removeProduct(productId, userId) {
     try {
-      const url = `${ENDPOINTS.REMOVE_PRODUCT}/${productId}`;
-      const response = await this.client.delete(url);
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Delete a product by URL (DELETE /api/products with body { url })
-  async deleteProductByUrl(productUrl) {
-    try {
-      const payload = { url: productUrl };
-      const response = await this.client.delete(ENDPOINTS.REMOVE_PRODUCT, { data: payload });
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Update per-product alert (assumes endpoint /products/:id/alert)
-  async updatePriceAlert(productId, alertData) {
-    try {
-      // Send threshold instead of alertPrice
-      const payload = {
-        threshold: alertData.alertPrice || alertData.threshold,
-      };
-      const url = `${ENDPOINTS.REMOVE_PRODUCT}/${productId}/alert`;
-      const response = await this.client.put(url, payload);
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Check a specific product (POST /products/check)
-  async checkSpecificProduct(payload) {
-    try {
-      // payload: { url: "..." }
-      const response = await this.client.post(ENDPOINTS.POST_CHECK_SPECIFIC_PRODUCT, payload);
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Update all tracked products (bulk update)
-  async updateAllTrackedProducts() {
-    try {
-      // POST /products/update-all with empty payload
-      const response = await this.client.post(ENDPOINTS.UPDATE_ALL_TRACKED_PRODUCTS, {});
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Get price history for a specific product URL
-  // Sends `url` and optional `limit` as query parameters. `limit` is controlled by the UI.
-  async getPriceHistory(productUrl, limit = undefined) {
-    try {
-      const params = { url: productUrl };
-      if (limit !== undefined && limit !== null) params.limit = limit;
-
-      const response = await this.client.get(ENDPOINTS.GET_PRICE_HISTORY, { params });
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Get price stats (status) for a product URL
-  async getPriceStats(productUrl) {
-    try {
-      const response = await this.client.get(ENDPOINTS.GET_PRICE_STATS, {
-        params: { url: productUrl },
+      return await this.request('DELETE', `/products/${productId}`, null, {
+        user_id: userId,
       });
-      return response.data;
     } catch (error) {
-      throw this.handleError(error);
+      throw error;
     }
   }
 
-  // Notifications
-  async getNotifications() {
+  /**
+   * 9. Get all tracked products for a user
+   * @param {number} userId
+   */
+  async getTrackedProducts(userId) {
     try {
-      const response = await this.client.get(ENDPOINTS.GET_NOTIFICATIONS);
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Update notification settings
-  // payload: { email: string, phone_number: string }
-  async putNotificationStatus(payload) {
-    try {
-      const response = await this.client.put(ENDPOINTS.PUT_NOTIFICATION_STATUS, payload);
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  async sendNotification(payload) {
-    try {
-      const response = await this.client.post(ENDPOINTS.POST_SEND_NOTIFICATION, payload);
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Trigger check-and-alert flow
-  async checkAndAlert(payload) {
-    try {
-      const response = await this.client.post(ENDPOINTS.POST_CHECK_AND_ALERT, payload);
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Get history across all products
-  async getHistoryAllProducts(params = {}) {
-    try {
-      const response = await this.client.get(ENDPOINTS.GET_HISTORY_ALL_PRODUCTS, { params });
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  // Delete specific product history by URL
-  async deleteSpecificProductHistory(productUrl) {
-    try {
-      const response = await this.client.delete(ENDPOINTS.DELETE_SPECIFIC_PRODUCT_HISTORY, {
-        params: { url: productUrl },
+      return await this.request('GET', '/products', null, {
+        user_id: userId,
       });
-      return response.data;
     } catch (error) {
-      throw this.handleError(error);
+      throw error;
     }
   }
 
+  /**
+   * 10. Update prices for all tracked products
+   * @param {number} userId
+   */
+  async updateAllProducts(userId) {
+    try {
+      return await this.request('POST', '/products/update-all', {}, {
+        user_id: userId,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ==================== HISTORY APIs ====================
+
+  /**
+   * 11. Get product history by URL
+   * @param {string} url
+   * @param {number} limit - optional limit
+   */
+  async getProductHistoryByUrl(url, limit = 10) {
+    try {
+      const params = { url };
+      if (limit) params.limit = limit;
+
+      return await this.request('GET', '/history/by-url', null, params);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 12. Get history for all products
+   * @param {number} userId
+   * @param {number} limit - optional limit
+   */
+  async getHistoryAllProducts(userId, limit = 10) {
+    try {
+      return await this.request('GET', '/history', null, {
+        user_id: userId,
+        limit,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 13. Delete product history entry
+   * @param {number} historyId
+   * @param {number} userId
+   */
+  async deleteProductHistory(historyId, userId) {
+    try {
+      return await this.request('DELETE', `/history/${historyId}`, null, {
+        user_id: userId,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 14. Get product stats
+   * @param {number} productId
+   * @param {number} userId
+   */
+  async getProductStats(productId, userId) {
+    try {
+      return await this.request('GET', `/history/${productId}/stats`, null, {
+        user_id: userId,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 15. Get product history by ID with optional stats
+   * @param {number} userId
+   * @param {number} productId
+   * @param {number} limit - optional limit
+   * @param {boolean} stats - optional stats flag
+   */
+  async getProductHistoryById(userId, productId, limit = 1, stats = true) {
+    try {
+      return await this.request('GET', '/history/by-id', null, {
+        user_id: userId,
+        product_id: productId,
+        limit,
+        stats,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ==================== TRACKING & ALERTS ====================
+
+  /**
+   * 16. Check and alert (check all products and trigger alerts if needed)
+   */
+  async checkAndAlert() {
+    try {
+      return await this.request('POST', '/track/check');
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ==================== UTILITY METHODS ====================
+
+  /**
+   * Centralized error handler
+   */
   handleError(error) {
-    if (error.response) {
-      return new Error(error.response.data.message || 'API request failed');
-    } else if (error.request) {
-      return new Error('No response from server');
-    } else {
-      return new Error('Error setting up request');
+    if (error instanceof Error) {
+      return error;
     }
+    return new Error(error.message || 'An unknown error occurred');
   }
 }
 

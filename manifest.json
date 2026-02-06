@@ -1,17 +1,19 @@
 {
   "manifest_version": 3,
-  "name": "Amazon Price Tracker",
+  "name": "PriceSnap",
   "version": "1.0.0",
   "description": "Track Amazon product prices and get notified when prices drop",
   "permissions": [
     "scripting",
     "activeTab",
     "storage",
-    "notifications"
+    "notifications",
+    "alarms"
   ],
   "host_permissions": [
     "https://www.amazon.com/*",
-    "https://www.amazon.in/*"
+    "https://www.amazon.in/*",
+    "https://amazon-price-tracker-465920637823.us-central1.run.app/*"
   ],
   "action": {
     "default_title": "Amazon Price Tracker",
